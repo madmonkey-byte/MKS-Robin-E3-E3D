@@ -16,34 +16,34 @@ Import("env")
 FEATURE_DEPENDENCIES = {}
 
 def load_config():
-	config = configparser.ConfigParser()
-	config.read("platformio.ini")
-	items = config.items('features')
-	for key in items:
-		ukey = key[0].upper()
-		if not ukey in FEATURE_DEPENDENCIES:
-			FEATURE_DEPENDENCIES[ukey] = {
-				'lib_deps': []
-			}
-		deps = re.sub(',\\s*', '\n', key[1]).strip().split('\n')
-		for dep in deps:
-			parts = dep.split('=')
-			name = parts.pop(0)
-			rest = '='.join(parts)
-			if name in ['extra_scripts', 'src_filter', 'lib_ignore']:
-				FEATURE_DEPENDENCIES[ukey][name] = rest
-			else:
-				FEATURE_DEPENDENCIES[ukey]['lib_deps'] += [dep]
+    config = configparser.ConfigParser()
+    config.read("platformio.ini")
+    items = config.items('features')
+    for key in items:
+        ukey = key[0].upper()
+        if ukey not in FEATURE_DEPENDENCIES:
+            FEATURE_DEPENDENCIES[ukey] = {
+            	'lib_deps': []
+            }
+        deps = re.sub(',\\s*', '\n', key[1]).strip().split('\n')
+        for dep in deps:
+        	parts = dep.split('=')
+        	name = parts.pop(0)
+        	rest = '='.join(parts)
+        	if name in ['extra_scripts', 'src_filter', 'lib_ignore']:
+        		FEATURE_DEPENDENCIES[ukey][name] = rest
+        	else:
+        		FEATURE_DEPENDENCIES[ukey]['lib_deps'] += [dep]
 
 def get_all_known_libs():
-	known_libs = []
-	for feature in FEATURE_DEPENDENCIES:
-		if not 'lib_deps' in FEATURE_DEPENDENCIES[feature]:
-			continue
-		for dep in FEATURE_DEPENDENCIES[feature]['lib_deps']:
-			name, _, _ = PackageManager.parse_pkg_uri(dep)
-			known_libs.append(name)
-	return known_libs
+    known_libs = []
+    for feature in FEATURE_DEPENDENCIES:
+        if 'lib_deps' not in FEATURE_DEPENDENCIES[feature]:
+            continue
+        for dep in FEATURE_DEPENDENCIES[feature]['lib_deps']:
+        	name, _, _ = PackageManager.parse_pkg_uri(dep)
+        	known_libs.append(name)
+    return known_libs
 
 def get_all_env_libs():
 	env_libs = []
@@ -68,61 +68,61 @@ def force_ignore_unused_libs():
 	set_env_field('lib_ignore', lib_ignore)
 
 def install_features_dependencies():
-	load_config()
-	for feature in FEATURE_DEPENDENCIES:
-		if not env.MarlinFeatureIsEnabled(feature):
-			continue
+    load_config()
+    for feature in FEATURE_DEPENDENCIES:
+        if not env.MarlinFeatureIsEnabled(feature):
+        	continue
 
-		if 'lib_deps' in FEATURE_DEPENDENCIES[feature]:
-			print("Adding lib_deps for %s... " % feature)
+        if 'lib_deps' in FEATURE_DEPENDENCIES[feature]:
+            print("Adding lib_deps for %s... " % feature)
 
-			# deps to add
-			deps_to_add = {}
-			for dep in FEATURE_DEPENDENCIES[feature]['lib_deps']:
-				name, _, _ = PackageManager.parse_pkg_uri(dep)
-				deps_to_add[name] = dep
+            # deps to add
+            deps_to_add = {}
+            for dep in FEATURE_DEPENDENCIES[feature]['lib_deps']:
+            	name, _, _ = PackageManager.parse_pkg_uri(dep)
+            	deps_to_add[name] = dep
 
-			# Does the env already have the dependency?
-			deps = env.GetProjectOption('lib_deps')
-			for dep in deps:
-				name, _, _ = PackageManager.parse_pkg_uri(dep)
-				if name in deps_to_add:
-					del deps_to_add[name]
+            # Does the env already have the dependency?
+            deps = env.GetProjectOption('lib_deps')
+            for dep in deps:
+            	name, _, _ = PackageManager.parse_pkg_uri(dep)
+            	if name in deps_to_add:
+            		del deps_to_add[name]
 
-			# Are there any libraries that should be ignored?
-			lib_ignore = env.GetProjectOption('lib_ignore')
-			for dep in deps:
-				name, _, _ = PackageManager.parse_pkg_uri(dep)
-				if name in deps_to_add:
-					del deps_to_add[name]
+            # Are there any libraries that should be ignored?
+            lib_ignore = env.GetProjectOption('lib_ignore')
+            for dep in deps:
+            	name, _, _ = PackageManager.parse_pkg_uri(dep)
+            	if name in deps_to_add:
+            		del deps_to_add[name]
 
-			# Is there anything left?
-			if len(deps_to_add) > 0:
-				# Only add the missing dependencies
-				set_env_field('lib_deps', deps + list(deps_to_add.values()))
+            			# Is there anything left?
+            if deps_to_add:
+                # Only add the missing dependencies
+                set_env_field('lib_deps', deps + list(deps_to_add.values()))
 
-		if 'extra_scripts' in FEATURE_DEPENDENCIES[feature]:
-			print("Executing extra_scripts for %s... " % feature)
-			env.SConscript(FEATURE_DEPENDENCIES[feature]['extra_scripts'], exports="env")
+        if 'extra_scripts' in FEATURE_DEPENDENCIES[feature]:
+        	print("Executing extra_scripts for %s... " % feature)
+        	env.SConscript(FEATURE_DEPENDENCIES[feature]['extra_scripts'], exports="env")
 
-		if 'src_filter' in FEATURE_DEPENDENCIES[feature]:
-			print("Adding src_filter for %s... " % feature)
-			src_filter = ' '.join(env.GetProjectOption('src_filter'))
-			# first we need to remove the references to the same folder
-			my_srcs = re.findall( r'[+-](<.*?>)', FEATURE_DEPENDENCIES[feature]['src_filter'])
-			cur_srcs = re.findall( r'[+-](<.*?>)', src_filter)
-			for d in my_srcs:
-				if d in cur_srcs:
-					src_filter = re.sub(r'[+-]' + d, '', src_filter)
+        if 'src_filter' in FEATURE_DEPENDENCIES[feature]:
+            print("Adding src_filter for %s... " % feature)
+            src_filter = ' '.join(env.GetProjectOption('src_filter'))
+            # first we need to remove the references to the same folder
+            my_srcs = re.findall( r'[+-](<.*?>)', FEATURE_DEPENDENCIES[feature]['src_filter'])
+            cur_srcs = re.findall( r'[+-](<.*?>)', src_filter)
+            for d in my_srcs:
+                if d in cur_srcs:
+                    src_filter = re.sub(f'[+-]{d}', '', src_filter)
 
-			src_filter = FEATURE_DEPENDENCIES[feature]['src_filter'] + ' ' + src_filter
-			set_env_field('src_filter', [src_filter])
-			env.Replace(SRC_FILTER=src_filter)
+            src_filter = FEATURE_DEPENDENCIES[feature]['src_filter'] + ' ' + src_filter
+            set_env_field('src_filter', [src_filter])
+            env.Replace(SRC_FILTER=src_filter)
 
-		if 'lib_ignore' in FEATURE_DEPENDENCIES[feature]:
-			print("Ignoring libs for %s... " % feature)
-			lib_ignore = env.GetProjectOption('lib_ignore') + [FEATURE_DEPENDENCIES[feature]['lib_ignore']]
-			set_env_field('lib_ignore', lib_ignore)
+        if 'lib_ignore' in FEATURE_DEPENDENCIES[feature]:
+        	print("Ignoring libs for %s... " % feature)
+        	lib_ignore = env.GetProjectOption('lib_ignore') + [FEATURE_DEPENDENCIES[feature]['lib_ignore']]
+        	set_env_field('lib_ignore', lib_ignore)
 
 #
 # Find a compiler, considering the OS
@@ -170,36 +170,32 @@ def search_compiler():
 # Use the compiler to get a list of all enabled features
 #
 def load_marlin_features():
-	if "MARLIN_FEATURES" in env:
-		return
+    if "MARLIN_FEATURES" in env:
+    	return
 
-	# Process defines
-	#print(env.Dump())
-	build_flags = env.get('BUILD_FLAGS')
-	build_flags = env.ParseFlagsExtended(build_flags)
+    # Process defines
+    #print(env.Dump())
+    build_flags = env.get('BUILD_FLAGS')
+    build_flags = env.ParseFlagsExtended(build_flags)
 
-	cxx = search_compiler()
-	cmd = [cxx]
+    cxx = search_compiler()
+    cmd = [cxx]
 
-	# Build flags from board.json
-	#if 'BOARD' in env:
-	#	cmd += [env.BoardConfig().get("build.extra_flags")]
-	for s in build_flags['CPPDEFINES']:
-		if isinstance(s, tuple):
-			cmd += ['-D' + s[0] + '=' + str(s[1])]
-		else:
-			cmd += ['-D' + s]
-
-	cmd += ['-w -dM -E -x c++ buildroot/share/PlatformIO/scripts/common-dependencies.h']
-	cmd = ' '.join(cmd)
-	print(cmd)
-	define_list = subprocess.check_output(cmd, shell=True).splitlines()
-	marlin_features = {}
-	for define in define_list:
-		feature = define[8:].strip().decode().split(' ')
-		feature, definition = feature[0], ' '.join(feature[1:])
-		marlin_features[feature] = definition
-	env["MARLIN_FEATURES"] = marlin_features
+    	# Build flags from board.json
+    	#if 'BOARD' in env:
+    	#	cmd += [env.BoardConfig().get("build.extra_flags")]
+    for s in build_flags['CPPDEFINES']:
+        cmd += [f'-D{s[0]}={str(s[1])}'] if isinstance(s, tuple) else [f'-D{s}']
+    cmd += ['-w -dM -E -x c++ buildroot/share/PlatformIO/scripts/common-dependencies.h']
+    cmd = ' '.join(cmd)
+    print(cmd)
+    define_list = subprocess.check_output(cmd, shell=True).splitlines()
+    marlin_features = {}
+    for define in define_list:
+    	feature = define[8:].strip().decode().split(' ')
+    	feature, definition = feature[0], ' '.join(feature[1:])
+    	marlin_features[feature] = definition
+    env["MARLIN_FEATURES"] = marlin_features
 
 #
 # Return True if a matching feature is enabled
