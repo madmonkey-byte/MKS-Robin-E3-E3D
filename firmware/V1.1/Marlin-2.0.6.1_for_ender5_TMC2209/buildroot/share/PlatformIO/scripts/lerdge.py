@@ -7,7 +7,7 @@ board = DefaultEnvironment().BoardConfig()
 custom_ld_script = os.path.abspath("buildroot/share/PlatformIO/ldscripts/lerdge.ld")
 for i, flag in enumerate(env["LINKFLAGS"]):
     if "-Wl,-T" in flag:
-        env["LINKFLAGS"][i] = "-Wl,-T" + custom_ld_script
+        env["LINKFLAGS"][i] = f"-Wl,-T{custom_ld_script}"
     elif flag == "-T":
         env["LINKFLAGS"][i + 1] = custom_ld_script
 
@@ -31,13 +31,12 @@ def encrypt_file(input, output_file, file_length):
 def encrypt(source, target, env):
     print("Encrypting to:", board.get("build.firmware"))
     firmware = open(target[0].path, "rb")
-    result = open(target[0].dir.path + "/" + board.get("build.firmware"), "wb")
-    length = os.path.getsize(target[0].path)
+    with open(f'{target[0].dir.path}/' + board.get("build.firmware"), "wb") as result:
+        length = os.path.getsize(target[0].path)
 
-    encrypt_file(firmware, result, length)
+        encrypt_file(firmware, result, length)
 
-    firmware.close()
-    result.close()
+        firmware.close()
 
 if 'firmware' in board.get("build").keys():
   env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", encrypt);
